@@ -4,23 +4,44 @@ import com.github.jasync.sql.db.Configuration
 import com.github.jasync.sql.db.Connection
 import com.github.jasync.sql.db.QueryResult
 import com.github.jasync.sql.db.mysql.MySQLConnection
-import io.ktor.application.*
-import io.ktor.response.*
-import io.ktor.routing.*
-import io.ktor.http.*
-import io.ktor.gson.*
-import io.ktor.features.*
-import io.ktor.http.content.resources
-import io.ktor.http.content.static
+import io.ktor.application.ApplicationCall
+import io.ktor.application.call
+import io.ktor.application.install
+import io.ktor.features.ContentNegotiation
+import io.ktor.gson.gson
 import io.ktor.pipeline.PipelineContext
+import io.ktor.response.respond
+import io.ktor.routing.get
+import io.ktor.routing.routing
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
 import kotlinx.coroutines.future.await
 import mu.KotlinLogging
 
 
-fun main(args: Array<String>): Unit {
+fun main(args: Array<String>) {
+  val server = embeddedServer(Netty, port = 8080) {
+    install(ContentNegotiation) {
+      gson {
+        setPrettyPrinting()
+      }
 
-    io.ktor.server.netty.DevelopmentEngine.main(args)
-
+      routing {
+        get("/") {
+          logger.info { "handling mysql request" }
+          handleMysqlRequest("select 0")
+        }
+      }
+    }
+  }
+  println("STARTING")
+  connection.connect().get()
+  try {
+    server.start(wait = true)
+  } finally {
+    println("DISCO")
+    connection.disconnect().get()
+  }
 }
 
 private val logger = KotlinLogging.logger {}
@@ -35,43 +56,6 @@ val connection: Connection = MySQLConnection(
         )
 )
 
-@Suppress("unused") // Referenced in application.conf
-fun Application.module() {
-    install(ContentNegotiation) {
-        gson {
-        }
-    }
-
-    environment.monitor.subscribe(ApplicationStarting) {
-        println("STARTING")
-        connection.connect().get()
-    }
-
-    environment.monitor.subscribe(ApplicationStopping) { application: Application ->
-        println("DISCO")
-        connection.disconnect().get()
-    }
-
-    routing {
-//        get("/") {
-//            call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
-//        }
-
-        get("/") {
-            logger.info { "handling mysql request" }
-            handleMysqlRequest("select 0")
-        }
-
-        // Static feature. Try to access `/static/ktor_logo.svg`
-        static("/static") {
-            resources("static")
-        }
-
-        get("/json/gson") {
-            call.respond(mapOf("hello" to "world"))
-        }
-    }
-}
 
 private suspend fun PipelineContext<Unit, ApplicationCall>
         .handleMysqlRequest(query: String) {
@@ -79,5 +63,5 @@ private suspend fun PipelineContext<Unit, ApplicationCall>
     call.respond(queryResult.rows!![0][0].toString())
 }
 
-suspend fun Connection.sendPreparedStatementAwait(query: String, values: List<Any> = emptyList()): QueryResult =
+private suspend fun Connection.sendPreparedStatementAwait(query: String, values: List<Any> = emptyList()): QueryResult =
         this.sendPreparedStatement(query, values).await()
