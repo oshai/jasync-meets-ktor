@@ -3,7 +3,9 @@ package com.oshai
 import com.github.jasync.sql.db.Configuration
 import com.github.jasync.sql.db.Connection
 import com.github.jasync.sql.db.QueryResult
-import com.github.jasync.sql.db.mysql.MySQLConnection
+import com.github.jasync.sql.db.mysql.pool.MySQLConnectionFactory
+import com.github.jasync.sql.db.pool.ConnectionPool
+import com.github.jasync.sql.db.pool.PoolConfiguration
 import io.ktor.application.ApplicationCall
 import io.ktor.application.call
 import io.ktor.application.install
@@ -17,49 +19,53 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.future.await
 import mu.KotlinLogging
+import java.util.concurrent.TimeUnit
 
 
 fun main(args: Array<String>) {
-  val server = embeddedServer(Netty, port = 8080) {
-    install(ContentNegotiation) {
-      gson {
-        setPrettyPrinting()
-      }
+    val server = embeddedServer(Netty, port = 8080) {
+        install(ContentNegotiation) {
+            gson {
+                setPrettyPrinting()
+            }
 
-      routing {
-        get("/") {
-          logger.info { "handling mysql request" }
-          handleMysqlRequest("select 0")
+            routing {
+                get("/") {
+                    logger.info { "handling mysql request" }
+                    handleMysqlRequest("select 0")
+                }
+            }
         }
-      }
     }
-  }
-  println("STARTING")
-  connection.connect().get()
-  try {
-    server.start(wait = true)
-  } finally {
-    println("DISCO")
-    connection.disconnect().get()
-  }
+    println("STARTING")
+    connectionPool.connect().get()
+    try {
+        server.start(wait = true)
+    } finally {
+        println("DISCO")
+        connectionPool.disconnect().get()
+    }
 }
 
 private val logger = KotlinLogging.logger {}
 
-val connection: Connection = MySQLConnection(
-        Configuration(
-                username = "username",
-                password = "password",
-                host = "localhost",
-                port = 3306,
-                database = "schema"
-        )
+val configuration = Configuration(
+        "mysql_async",
+        "localhost",
+        33306,
+        "root",
+        "mysql_async_tests")
+val poolConfiguration = PoolConfiguration(
+        maxObjects = 100,
+        maxQueueSize = 10_000,
+        maxIdle = TimeUnit.MINUTES.toMillis(15),
+        validationInterval = TimeUnit.SECONDS.toMillis(30)
 )
+val connectionPool = ConnectionPool(factory = MySQLConnectionFactory(configuration), configuration = poolConfiguration)
 
 
-private suspend fun PipelineContext<Unit, ApplicationCall>
-        .handleMysqlRequest(query: String) {
-    val queryResult = connection.sendPreparedStatementAwait(query = query)
+private suspend fun PipelineContext<Unit, ApplicationCall>.handleMysqlRequest(query: String) {
+    val queryResult = connectionPool.sendPreparedStatementAwait(query = query)
     call.respond(queryResult.rows!![0][0].toString())
 }
 
