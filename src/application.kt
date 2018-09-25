@@ -57,8 +57,8 @@ val configuration = Configuration(
         "mysql_async_tests")
 val poolConfiguration = PoolConfiguration(
         maxObjects = 100,
-        maxQueueSize = 10_000,
         maxIdle = TimeUnit.MINUTES.toMillis(15),
+        maxQueueSize = 10_000,
         validationInterval = TimeUnit.SECONDS.toMillis(30)
 )
 val connectionPool = ConnectionPool(factory = MySQLConnectionFactory(configuration), configuration = poolConfiguration)
