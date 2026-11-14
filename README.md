@@ -1,3 +1,5 @@
-> **Note:** Legacy repository using io.github.microutils:kotlin-logging 1.x. Active development moved to https://github.com/oshai/kotlin-logging (io.github.oshai:kotlin-logging).
+# jasync-meets-ktor
 
-# sample moved to https://github.com/jasync-sql/jasync-sql/tree/master/samples/ktor
+Example integrating [jasync-sql](https://github.com/jasync-sql/jasync-sql) (`jasync-mysql`), [Ktor](https://ktor.io/), and [kotlin-logging](https://github.com/oshai/kotlin-logging).
+
+See also the upstream sample at https://github.com/jasync-sql/jasync-sql/tree/master/samples/ktor.
